@@ -18,6 +18,10 @@ func New(v *cnvim.Nvim, w cnvim.Window) *Window {
 	return &Window{v, w, 0, 0}
 }
 
+func (w *Window) Valid() (bool, error) {
+	return w.cNvim.IsWindowValid(w.cWindow)
+}
+
 func (w *Window) Close() error {
 	c, err := w.cNvim.CurrentWindow()
 	if err != nil {
