@@ -18,6 +18,10 @@ func New(v *cnvim.Nvim, b cnvim.Buffer) *Buffer {
 	return &Buffer{v, b}
 }
 
+func (b *Buffer) Valid() (bool, error) {
+	return b.cNvim.IsBufferValid(b.cBuffer)
+}
+
 func (b *Buffer) Name() (string, error) {
 	return b.cNvim.BufferName(b.cBuffer)
 }
@@ -61,10 +65,10 @@ func (b *Buffer) CommandOutputf(format string, args ...interface{}) (string, err
 }
 
 type Position struct {
-	bufnum int
-	X      int
-	Y      int
-	off    int
+	BufferNumber int
+	LineNumber   int
+	Column       int
+	Offset       int
 }
 
 var (
@@ -72,28 +76,48 @@ var (
 )
 
 func NewPosition(s string) (Position, error) {
+	var (
+		p   Position
+		err error
+	)
 	nums := rPosition.FindStringSubmatch(s)
-	bufnum, err := strconv.Atoi(nums[1])
+	p.BufferNumber, err = strconv.Atoi(nums[1])
 	if err != nil {
-		return Position{}, err
+		return p, err
 	}
-	lnum, err := strconv.Atoi(nums[2])
+	p.LineNumber, err = strconv.Atoi(nums[2])
 	if err != nil {
-		return Position{}, err
+		return p, err
 	}
-	col, err := strconv.Atoi(nums[3])
+	p.Column, err = strconv.Atoi(nums[3])
 	if err != nil {
-		return Position{}, err
+		return p, err
 	}
-	off, err := strconv.Atoi(nums[4])
+	p.Offset, err = strconv.Atoi(nums[4])
 	if err != nil {
-		return Position{}, err
+		return p, err
 	}
-	return Position{bufnum, lnum - 1, col - 1, off}, nil
+	return p, nil
+}
+
+func (p Position) X() int {
+	return p.Column - 1
+}
+
+func (p *Position) SetX(x int) {
+	p.Column = x + 1
+}
+
+func (p Position) Y() int {
+	return p.LineNumber - 1
+}
+
+func (p *Position) SetY(y int) {
+	p.LineNumber = y + 1
 }
 
 func (p Position) String() string {
-	return fmt.Sprintf("[%d, %d, %d, %d]", p.bufnum, p.X+1, p.Y+1, p.off)
+	return fmt.Sprintf("[%d, %d, %d, %d]", p.BufferNumber, p.LineNumber, p.Column, p.Offset)
 }
 
 func (b *Buffer) CurrentCursor() (Position, error) {
