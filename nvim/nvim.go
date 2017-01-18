@@ -2,6 +2,8 @@ package nvim
 
 import (
 	"fmt"
+	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/minodisk/go-nvim/window"
@@ -16,6 +18,40 @@ const (
 	WindowVertical    WindowDirection = "vertical"
 	WindowTopLeft     WindowPosition  = "topleft"
 	WindowBottomRight WindowPosition  = "botright"
+
+	CompletionNone         = ""
+	CompletionAugroup      = "augroup"
+	CompletionBuffer       = "buffer"
+	CompletionBehave       = "behave"
+	CompletionColor        = "color"
+	CompletionCommand      = "command"
+	CompletionCompiler     = "compiler"
+	CompletionCscope       = "cscope"
+	CompletionDir          = "dir"
+	CompletionEnvironment  = "environment"
+	CompletionEvent        = "event"
+	CompletionExpression   = "expression"
+	CompletionFile         = "file"
+	CompletionFileInPath   = "file_in_path"
+	CompletionFiletype     = "filetype"
+	CompletionFunction     = "function"
+	CompletionHelp         = "help"
+	CompletionHighlight    = "highlight"
+	CompletionHistory      = "history"
+	CompletionLocale       = "locale"
+	CompletionMapping      = "mapping"
+	CompletionMenu         = "menu"
+	CompletionOption       = "option"
+	CompletionShellcmd     = "shellcmd"
+	CompletionSign         = "sign"
+	CompletionSyntax       = "syntax"
+	CompletionSyntime      = "syntime"
+	CompletionTag          = "tag"
+	CompletionTagListfiles = "tag_listfiles"
+	CompletionUser         = "user"
+	CompletionVar          = "var"
+	CompletionCustom       = "custom"
+	CompletionCustomlist   = "customlist"
 )
 
 type Nvim struct {
@@ -48,6 +84,31 @@ func (v *Nvim) VarString(name string) (string, error) {
 		return "", err
 	}
 	return s, nil
+}
+
+func (v *Nvim) CurrentDirectory() (string, error) {
+	return v.CommandOutput("pwd")
+}
+
+func (v *Nvim) SetCurrentDirectory(dir string) error {
+	return v.cNvim.SetCurrentDirectory(dir)
+}
+
+func (v *Nvim) NearestDirectory() string {
+	// Get the directory of the source of the focused buffer.
+	if name, err := v.CurrentBufferName(); err == nil && name != "" {
+		return filepath.Dir(name)
+	}
+	// Get current directory where Vim is opened at.
+	if name, err := v.CurrentDirectory(); err == nil && name != "" {
+		return name
+	}
+	// Get home directory for user.
+	if user, err := user.Current(); err == nil {
+		return user.HomeDir
+	}
+	// Root.
+	return "/"
 }
 
 func (v *Nvim) CreateWindowLeft(width int, name string) (*window.Window, error) {
@@ -131,12 +192,12 @@ func (v *Nvim) Windows() ([]*window.Window, error) {
 	return windows, nil
 }
 
-func (v *Nvim) InputString(prompt string) (string, error) {
-	return v.Input(prompt, "")
+func (v *Nvim) InputString(prompt, completion string) (string, error) {
+	return v.Input(prompt, "", completion)
 }
 
-func (v *Nvim) InputStrings(prompt string) ([]string, error) {
-	out, err := v.Input(fmt.Sprintf("%s, separated by commas", prompt), "")
+func (v *Nvim) InputStrings(prompt string, completion string) ([]string, error) {
+	out, err := v.Input(fmt.Sprintf("%s, separated by commas", prompt), "", completion)
 	if err != nil {
 		return nil, err
 	}
@@ -148,19 +209,33 @@ func (v *Nvim) InputStrings(prompt string) ([]string, error) {
 }
 
 func (v *Nvim) InputBool(prompt string) (bool, error) {
-	out, err := v.Input(fmt.Sprintf("%s [y/n]", prompt), "")
+	out, err := v.Input(fmt.Sprintf("%s [y/n]", prompt), "", CompletionNone)
 	if err != nil {
 		return false, err
 	}
 	return strings.ToLower(out) == "y", nil
 }
 
-func (v *Nvim) Input(prompt, defaultText string) (string, error) {
-	out, err := v.cNvim.CommandOutput(fmt.Sprintf(`echo input("%s: ", "%s")`, prompt, defaultText))
+func (v *Nvim) Input(prompt, defaultText, completion string) (string, error) {
+	var cmd string
+	if completion == CompletionNone {
+		cmd = fmt.Sprintf("echo input(\"%s: \", \"%s\")", prompt, defaultText)
+	} else {
+		cmd = fmt.Sprintf("echo input(\"%s: \", \"%s\", \"%s\")", prompt, defaultText, completion)
+	}
+	return v.CommandOutput(cmd)
+}
+
+func (v *Nvim) CommandOutput(cmd string) (string, error) {
+	out, err := v.cNvim.CommandOutput(fmt.Sprintf("%s", cmd))
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+func (v *Nvim) Command(cmd string) error {
+	return v.cNvim.Command(fmt.Sprintf("silent %s", cmd))
 }
 
 func (v *Nvim) Printf(format string, args ...interface{}) error {
