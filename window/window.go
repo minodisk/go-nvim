@@ -23,6 +23,14 @@ func (w *Window) Valid() (bool, error) {
 }
 
 func (w *Window) Close() error {
+	ok, err := w.Valid()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
 	c, err := w.cNvim.CurrentWindow()
 	if err != nil {
 		return err
