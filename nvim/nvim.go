@@ -87,7 +87,7 @@ func (v *Nvim) VarString(name string) (string, error) {
 }
 
 func (v *Nvim) CurrentDirectory() (string, error) {
-	return v.CommandOutput("pwd")
+	return v.CommandOutput("silent pwd")
 }
 
 func (v *Nvim) SetCurrentDirectory(dir string) error {
@@ -192,12 +192,13 @@ func (v *Nvim) Windows() ([]*window.Window, error) {
 	return windows, nil
 }
 
-func (v *Nvim) InputString(prompt, completion string) (string, error) {
-	return v.Input(prompt, "", completion)
+func (v *Nvim) InputString(prompt, defaultText, completion string) (string, error) {
+	return v.Input(prompt, defaultText, completion)
 }
 
-func (v *Nvim) InputStrings(prompt string, completion string) ([]string, error) {
-	out, err := v.Input(fmt.Sprintf("%s, separated by commas", prompt), "", completion)
+func (v *Nvim) InputStrings(prompt string, defaultTexts []string, completion string) ([]string, error) {
+	defaultText := strings.Join(defaultTexts, ", ")
+	out, err := v.Input(fmt.Sprintf("%s, separated by commas", prompt), defaultText, completion)
 	if err != nil {
 		return nil, err
 	}
