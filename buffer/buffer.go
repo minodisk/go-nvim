@@ -34,6 +34,14 @@ func (b *Buffer) Focus() error {
 	return b.cNvim.SetCurrentBuffer(b.cBuffer)
 }
 
+func (b *Buffer) Focused() (bool, error) {
+	cb, err := b.cNvim.CurrentBuffer()
+	if err != nil {
+		return false, err
+	}
+	return b.cBuffer == cb, nil
+}
+
 func (b *Buffer) Commandf(format string, args ...interface{}) error {
 	c, err := b.cNvim.CurrentBuffer()
 	if err != nil {
@@ -62,6 +70,10 @@ func (b *Buffer) CommandOutputf(format string, args ...interface{}) (string, err
 		return "", err
 	}
 	return strings.TrimSpace(s), nil
+}
+
+type Range struct {
+	Start, End Position
 }
 
 type Position struct {
@@ -121,33 +133,41 @@ func (p Position) String() string {
 }
 
 func (b *Buffer) CurrentCursor() (Position, error) {
-	c, err := b.cNvim.CurrentBuffer()
-	if err != nil {
-		return Position{}, err
-	}
-	if err := b.cNvim.SetCurrentBuffer(b.cBuffer); err != nil {
-		return Position{}, err
-	}
-	defer b.cNvim.SetCurrentBuffer(c)
+	return b.getpos(".")
+}
 
-	p, err := b.CommandOutputf("silent echo getpos('.')")
+func (b *Buffer) SetCurrentCursor(p Position) error {
+	return b.setpos(".", p)
+}
+
+func (b *Buffer) SelectedRange() (Range, error) {
+	r := Range{}
+	var err error
+	r.Start, err = b.getpos("'<")
+	if err != nil {
+		return r, err
+	}
+	r.End, err = b.getpos("'>")
+	if err != nil {
+		return r, err
+	}
+	return r, nil
+}
+
+func (b *Buffer) Mode() (string, error) {
+	return b.CommandOutputf("silent echo mode()")
+}
+
+func (b *Buffer) getpos(expr string) (Position, error) {
+	p, err := b.CommandOutputf(fmt.Sprintf("silent echo getpos(\"%s\")", expr))
 	if err != nil {
 		return Position{}, err
 	}
 	return NewPosition(p)
 }
 
-func (b *Buffer) SetCurrentCursor(p Position) error {
-	c, err := b.cNvim.CurrentBuffer()
-	if err != nil {
-		return err
-	}
-	if err := b.cNvim.SetCurrentBuffer(b.cBuffer); err != nil {
-		return err
-	}
-	defer b.cNvim.SetCurrentBuffer(c)
-
-	return b.Commandf("call setpos('.', %s)", p.String())
+func (b *Buffer) setpos(expr string, p Position) error {
+	return b.Commandf("call setpos(\"%s\", %s)", expr, p.String())
 }
 
 func (b *Buffer) FileType() (string, error) {
@@ -157,26 +177,9 @@ func (b *Buffer) FileType() (string, error) {
 }
 
 // SetFileType sets filetype t to buffer.
-//
-// This method is WORKAROUND.
-// Using github.com/nvim/go-client nvim.SetBufferOption to set filetype finder,
-// FileType event of autocmd doesn't fire.
-// Though using nvim.Command("set filetype=foo"), FileType event fired.
 func (b *Buffer) SetFileType(t string) error {
 	return b.Commandf("set filetype=%s", t)
 }
-
-// func (b *Buffer) Option(name string) (interface{}, error) {
-// 	var res interface{}
-// 	if err := b.cNvim.BufferOption(b.cBuffer, name, &res); err != nil {
-// 		return nil, err
-// 	}
-// 	return res, nil
-// }
-
-// func (b *Buffer) SetOption(name string, value interface{}) error {
-// 	return b.cNvim.SetBufferOption(b.cBuffer, name, value)
-// }
 
 func (b *Buffer) Option() (Option, error) {
 	var o Option

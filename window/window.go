@@ -10,12 +10,10 @@ import (
 type Window struct {
 	cNvim   *cnvim.Nvim
 	cWindow cnvim.Window
-	width   int
-	height  int
 }
 
 func New(v *cnvim.Nvim, w cnvim.Window) *Window {
-	return &Window{v, w, 0, 0}
+	return &Window{v, w}
 }
 
 func (w *Window) Valid() (bool, error) {
@@ -43,26 +41,18 @@ func (w *Window) Close() error {
 	return w.cNvim.Command("quit")
 }
 
-func (w *Window) SetDefaultWidth(width int) {
-	w.width = width
-}
-
-func (w *Window) SetDefaultHeight(height int) {
-	w.height = height
-}
-
-func (w *Window) ResizeToDefaultWidth() error {
-	if w.width <= 0 {
+func (w *Window) SetWidth(width int) error {
+	if width <= 0 {
 		return nil
 	}
-	return w.cNvim.SetWindowWidth(w.cWindow, w.width)
+	return w.cNvim.SetWindowWidth(w.cWindow, width)
 }
 
-func (w *Window) ResizeToDefaultHeight() error {
-	if w.height <= 0 {
+func (w *Window) SetHeight(height int) error {
+	if height <= 0 {
 		return nil
 	}
-	return w.cNvim.SetWindowHeight(w.cWindow, w.height)
+	return w.cNvim.SetWindowHeight(w.cWindow, height)
 }
 
 func (w *Window) Buffer() (*buffer.Buffer, error) {
@@ -87,22 +77,8 @@ func (w *Window) Open(name string) error {
 	if err := w.Focus(); err != nil {
 		return err
 	}
-	// n := Escape(name)
-	// return w.cNvim.WriteOut(fmt.Sprintf("edit '%s'", n))
 	return w.cNvim.Command(fmt.Sprintf("edit `='%s'`", name))
 }
-
-// func (w *Window) Option(name string) (interface{}, error) {
-// 	var v interface{}
-// 	if err := w.cNvim.WindowOption(w.cWindow, name, &v); err != nil {
-// 		return nil, err
-// 	}
-// 	return v, nil
-// }
-//
-// func (w *Window) SetOption(name string, value interface{}) error {
-// 	return w.cNvim.SetWindowOption(w.cWindow, name, value)
-// }
 
 func (w *Window) Option() (Option, error) {
 	var o Option
