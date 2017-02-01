@@ -195,14 +195,66 @@ func (v *Nvim) Buffers() ([]*buffer.Buffer, error) {
 	return buffers, nil
 }
 
+type Choice struct {
+	Shortcut    byte
+	Description string
+}
+
+type Choices []Choice
+
+func (cs Choices) String() string {
+	strs := make([]string, len(cs))
+	for i, c := range cs {
+		strs[i] = fmt.Sprintf("&%s %s", string(c.Shortcut), c.Description)
+	}
+	return strings.Join(strs, "\n")
+}
+
+func (v *Nvim) Confirm(prompt string, choices Choices) (Choice, error) {
+	i, err := v.CallInt(fmt.Sprintf("confirm(\"%s: \", \"%s\")", Escape(prompt), Escape(choices.String())))
+	if err != nil {
+		return Choice{}, err
+	}
+	i--
+	if !(0 <= i && i < len(choices)) {
+		return Choice{}, fmt.Errorf("chosen index %d is out of range", i)
+	}
+	return choices[i], nil
+}
+
 func (v *Nvim) InputString(prompt, defaultText, completion string) (string, error) {
 	var cmd string
 	if completion == CompletionNone {
-		cmd = fmt.Sprintf("echo input(\"%s: \", \"%s\")", Escape(prompt), Escape(defaultText))
+		cmd = fmt.Sprintf("input(\"%s: \", \"%s\")", Escape(prompt), Escape(defaultText))
 	} else {
-		cmd = fmt.Sprintf("echo input(\"%s: \", \"%s\", \"%s\")", Escape(prompt), Escape(defaultText), Escape(completion))
+		cmd = fmt.Sprintf("input(\"%s: \", \"%s\", \"%s\")", Escape(prompt), Escape(defaultText), Escape(completion))
 	}
-	return v.CommandOutput(cmd)
+	return v.CallString(cmd)
+}
+
+func (v *Nvim) CallString(cmd string) (string, error) {
+	var result string
+	if err := v.Call(cmd, &result); err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
+func (v *Nvim) CallInt(cmd string) (int, error) {
+	var result int
+	if err := v.Call(cmd, &result); err != nil {
+		return 0, err
+	}
+	return result, nil
+}
+
+func (v *Nvim) Call(cmd string, result interface{}) error {
+	const varName = "go_nvim_tmp"
+	b := v.cNvim.NewBatch()
+	b.Command(fmt.Sprintf("let g:%s = %s", varName, cmd))
+	b.Var(varName, result)
+	b.Command(fmt.Sprintf("unlet g:%s", varName))
+	return b.Execute()
 }
 
 func (v *Nvim) InputStrings(prompt string, defaultTexts []string, completion string) ([]string, error) {
@@ -227,15 +279,13 @@ func (v *Nvim) InputBool(prompt string) (bool, error) {
 }
 
 func (v *Nvim) CommandOutput(cmd string) (string, error) {
-	out, err := v.cNvim.CommandOutput(cmd)
-	if err != nil {
+	var res string
+	b := v.cNvim.NewBatch()
+	b.CommandOutput(cmd, &res)
+	if err := b.Execute(); err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(out), nil
-}
-
-func (v *Nvim) Command(cmd string) error {
-	return v.cNvim.Command(fmt.Sprintf("silent %s", cmd))
+	return strings.TrimSpace(res), nil
 }
 
 func (v *Nvim) Printf(format string, args ...interface{}) error {
